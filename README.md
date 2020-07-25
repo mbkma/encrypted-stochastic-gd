@@ -6,7 +6,7 @@ Encrypted stochastic gradient descent using secure two-party computation and the
 ---
 
 * A **Linux distribution** of your choice (ESGD was developed and tested with recent versions of [Debian](https://www.debian.org/)).
-* **Required packages for ABY:**
+* **Required packages:**
   * [`g++`](https://packages.debian.org/testing/g++) (version >=8)
     or another compiler and standard library implementing C++17 including the filesystem library
   * [`make`](https://packages.debian.org/testing/make)
@@ -21,7 +21,7 @@ Encrypted stochastic gradient descent using secure two-party computation and the
 ---
 1. Clone the git repository by running: `git clone https://github.com/mbkma/encrypted-stochastic-gd.git`
 2. Init git submodules: `git submodule update --init --recursive`
-3. Use CMake configure the build: `mkdir build && cd build && cmake ..`
+3. Use CMake to configure the build: `mkdir build && cd build && cmake ..`
 4. Call `make -j5` in the build directory.
 
 #### Example
