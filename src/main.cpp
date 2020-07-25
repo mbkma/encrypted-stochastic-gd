@@ -33,7 +33,7 @@ int32_t read_test_options(int32_t* argcp, char*** argvp, e_role* role,
 
     parsing_ctx options[] = {
         {(void*) &int_role, T_NUM, "r", "Role: 0/1", true, false },
-        {(void*) learning_rate, T_DOUBLE, "l", "Learning Rate", true, true },
+        {(void*) learning_rate, T_DOUBLE, "l", "Learning Rate", true, false },
 
         {(void*) &int_precision, T_NUM, "p", "Precision, default: 8", false, false },
         {(void*) provide_data, T_FLAG, "d", "Provide Data, default: False", false, false },
@@ -63,14 +63,14 @@ int32_t read_test_options(int32_t* argcp, char*** argvp, e_role* role,
     if (int_precision != 0)
         *precision = int_precision;
 
-    if (role == 0 && (*learning_rate <= 0 || *learning_rate >= 1))
+    if (*learning_rate <= 0 || *learning_rate >= 1)
     {
         std::cout << "error: specify a valid learning rate (-l) in (0, 1)!" << std::endl;
         std::cout << "Exiting" << std::endl;
         exit(0);
     }
 
-    if (role == 0 && (*learning_rate < 1.0 / (1ull << *precision)))
+    if (*learning_rate < 1.0 / (1ull << *precision))
     {
         std::cout << "error: learning rate is too small (< 2^-Precision)" << std::endl;
         std::cout << "Exiting" << std::endl;

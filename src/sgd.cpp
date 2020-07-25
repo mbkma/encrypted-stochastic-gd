@@ -23,8 +23,6 @@
 #include <math.h>
 #include "../extern/ABY/src/abycore/circuit/arithmeticcircuits.h"
 #include "../extern/ABY/src/abycore/sharing/sharing.h"
-#include "../extern/mnist/include/mnist/mnist_reader.hpp"
-#include "../extern/mnist/include/mnist/mnist_utils.hpp"
 #include "linear-model-generator.h"
 
 #define INPUT_BITLEN  32
@@ -143,17 +141,15 @@ generate_shared_data (EncryptionEngine *engine,
 static share*
 mul_q (EncryptionEngine *engine, share *ina, share *inb)
 {
-    share *ina_inv, *inb_inv, *ina_inv_yao, *inb_inv_yao, *ina_yao, *inb_yao, *mul_1, *mul_2, *ina_is_less_zero, *inb_is_less_zero, *res, *res_inv, *dec;
+    share *ina_inv_yao, *inb_inv_yao, *ina_yao, *inb_yao, *mul_1, *mul_2, *ina_is_less_zero, *inb_is_less_zero, *res, *res_inv, *dec;
     share *threshold = engine->yc->PutCONSGate(1ull << (INPUT_BITLEN-1), INPUT_BITLEN);
     share *shift = engine->yc->PutCONSGate(engine->shift, INPUT_BITLEN);
 
-    ina_inv = engine->ac->PutINVGate(ina);
-    inb_inv = engine->ac->PutINVGate(inb);
-
     ina_yao = engine->yc->PutA2YGate(ina);
     inb_yao = engine->yc->PutA2YGate(inb);
-    ina_inv_yao = engine->yc->PutA2YGate(ina_inv);
-    inb_inv_yao = engine->yc->PutA2YGate(inb_inv);
+
+    ina_inv_yao = engine->yc->PutINVGate(ina_yao);
+    inb_inv_yao = engine->yc->PutINVGate(inb_yao);
 
     // if ina < 0 or inb < 0
     ina_is_less_zero = engine->yc->PutGTGate(ina_yao, threshold);
