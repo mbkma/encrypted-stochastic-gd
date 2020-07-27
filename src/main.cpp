@@ -1,5 +1,5 @@
 /**
- \file      sgd.cpp
+ \file      main.cpp
  \author    Johannes Unruh johannes.unruh@fau.de
  \copyright Johannes Unruh
             This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,12 @@
  \brief     Stochastic Gradient Descent Test class implementation.
  */
 
-//Utility libs
 #include <ENCRYPTO_utils/crypto/crypto.h>
 #include <ENCRYPTO_utils/parse_options.h>
-//ABY Party class
 #include "../extern/ABY/src/abycore/aby/abyparty.h"
-
 #include "sgd.h"
+
+using namespace encsgd;
 
 int32_t read_test_options(int32_t* argcp, char*** argvp, e_role* role,
                           double* learning_rate, uint32_t* precision,
@@ -89,14 +88,42 @@ int main(int argc, char** argv)
     bool provide_data = false;
     std::string address = "127.0.0.1";
     e_mt_gen_alg mt_alg = MT_OT;
+    uint32_t indices[max_iter];
+
+    int rows = 4177;
+    int columns = 8;
+    Matrix<double> plain_X(rows, columns);
+    Vector<double> plain_y(rows);
+    Vector<double> plain_w(columns);
+
+    seclvl seclvl = get_sec_lvl(secparam);
 
     read_test_options (&argc, &argv, &role, &learning_rate, &precision, &max_iter,
                        &provide_data, &nvals, &secparam, &address, &port);
 
-    seclvl seclvl = get_sec_lvl(secparam);
+    RegressionParams params;
+    params.maxIterations = max_iter;
+    params.learningRate = learning_rate;
+    params.indices = indices;
 
-    main_sgd (role, learning_rate, precision, max_iter, provide_data, address,
-              port, seclvl, nvals, nthreads, mt_alg);
+    sgd engine(role, precision, address, port, seclvl, nthreads, mt_alg);
+
+    engine.get_data (params, plain_X, plain_y, plain_w, provide_data);
+
+    uint32_t* encrypted_output = engine.encrypted_sgd (params, plain_X, plain_y, plain_w);
+
+    Vector<double> plain_output = engine.plain_sgd (params, plain_X, plain_y, plain_w);
+
+    std::cout << "---encrypted sgd---\n";
+    for (int i = 0; i < columns; i++)
+    {
+        std::cout << (int32_t)encrypted_output[i] / (double)engine.get_precision() << "\n";
+    }
+    std::cout << "\n";
+    std::cout << "---plain sgd---\n";
+    std::cout << plain_output << "\n";
+
+    free (encrypted_output);
 
     return 0;
 }

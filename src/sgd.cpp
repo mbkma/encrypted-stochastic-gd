@@ -29,54 +29,53 @@
 
 using namespace encsgd;
 
-EncryptionEngine *
-encryption_engine_new (e_role role, uint32_t precision, const std::string& address,
-                       uint16_t port, seclvl seclvl, uint32_t nthreads, e_mt_gen_alg mt_alg)
-{
-    EncryptionEngine *engine = (EncryptionEngine*) malloc (sizeof(EncryptionEngine));
 
+sgd::sgd (e_role role, uint32_t precision, const std::string& address,
+          uint16_t port, seclvl seclvl, uint32_t nthreads, e_mt_gen_alg mt_alg)
+{
     uint32_t bitlen = INPUT_BITLEN;
 
-    engine->party = new ABYParty(role, address, port, seclvl, bitlen, nthreads, mt_alg);
+    mParty = new ABYParty(role, address, port, seclvl, bitlen, nthreads, mt_alg);
 
-    std::vector<Sharing*>& sharing = engine->party->GetSharings();
+    std::vector<Sharing*>& sharing = mParty->GetSharings();
 
-    engine->role = role;
+    mRole = role;
 
-    engine->precision = 1ull << precision;
+    mPrecision = 1ull << precision;
 
-    engine->shift = precision;
+    mShift = precision;
 
-    engine->ac = (ArithmeticCircuit*) sharing[S_ARITH]->GetCircuitBuildRoutine();
+    mArithCir = (ArithmeticCircuit*) sharing[S_ARITH]->GetCircuitBuildRoutine();
 
-    engine->bc = (BooleanCircuit*) sharing[S_BOOL]->GetCircuitBuildRoutine();
+    mBoolCir = (BooleanCircuit*) sharing[S_BOOL]->GetCircuitBuildRoutine();
 
-    engine->yc = (BooleanCircuit*) sharing[S_YAO]->GetCircuitBuildRoutine();
-
-    return engine;
+    mYaoCir = (BooleanCircuit*) sharing[S_YAO]->GetCircuitBuildRoutine();
 }
 
 static void
 get_plain_data (Matrix<double>& plain_X, Vector<double>& plain_y)
 {
-    std::ifstream features("../data/train.data");
+    std::ifstream features("../data/abalone.data");
     for (int i = 0; i < plain_X.rows(); i++)
+    {
         for (int j = 0; j < plain_X.cols(); j++)
             features >> plain_X(i,j);
+        features >> plain_y(i);
+    }
     features.close();
 
+/*
     std::ifstream labels("../data/train.labels");
     for (int i = 0; i < plain_X.rows(); i++)
     {
         labels >> plain_y(i);
     }
-    labels.close();
+    labels.close();*/
 }
 
-static void
-generate_shared_data (EncryptionEngine *engine,
-                      share ***s_X, share **s_y, share **s_w,
-                      Matrix<double> plain_X, Vector<double> plain_y, Vector<double> plain_w)
+void
+sgd::generate_shared_data (share ***s_X, share **s_y, share **s_w,
+                           Matrix<double> plain_X, Vector<double> plain_y, Vector<double> plain_w)
 {
     int rows = plain_X.rows();
     int columns = plain_X.cols();
@@ -96,107 +95,143 @@ generate_shared_data (EncryptionEngine *engine,
     Vector<uint32_t> w_0;
     Vector<uint32_t> w_1;
 
-    plain_X *= engine->precision;
+    plain_X *= mPrecision;
     X = plain_X.cast <uint32_t> ();
     X_1.setRandom (rows, columns);
     X_0 = X - X_1;
 
-    plain_y *= engine->precision;
+    plain_y *= mPrecision;
     y = plain_y.cast <uint32_t> ();
     y_1.setRandom (rows);
     y_0 = y - y_1;
 
-    plain_w *= engine->precision;
+    plain_w *= mPrecision;
     w = plain_w.cast <uint32_t> ();
     w_1.setRandom (columns);
     w_0 = w - w_1;
 
-    if (engine->role == SERVER)
+    if (mRole == SERVER)
     {
         for (int i = 0; i < rows; i++)
             for (int j = 0; j < columns; j++)
-                s_X[i][j] = engine->ac->PutSharedINGate(X_0(i, j), INPUT_BITLEN);
+                s_X[i][j] = mArithCir->PutSharedINGate(X_0(i, j), INPUT_BITLEN);
 
         for (int i = 0; i < rows; i++)
-            s_y[i] = engine->ac->PutSharedINGate(y_0(i), INPUT_BITLEN);
+            s_y[i] = mArithCir->PutSharedINGate(y_0(i), INPUT_BITLEN);
 
         for (int i = 0; i < columns; i++)
-            s_w[i] = engine->ac->PutSharedINGate(w_0(i), INPUT_BITLEN);
+            s_w[i] = mArithCir->PutSharedINGate(w_0(i), INPUT_BITLEN);
     }
     else
     {
         for (int i = 0; i < rows; i++)
             for (int j = 0; j < columns; j++)
-                s_X[i][j] = engine->ac->PutSharedINGate(X_1(i, j), INPUT_BITLEN);
+                s_X[i][j] = mArithCir->PutSharedINGate(X_1(i, j), INPUT_BITLEN);
 
         for (int i = 0; i < rows; i++)
-            s_y[i] = engine->ac->PutSharedINGate(y_1(i), INPUT_BITLEN);
+            s_y[i] = mArithCir->PutSharedINGate(y_1(i), INPUT_BITLEN);
 
         for (int i = 0; i < columns; i++)
-            s_w[i] = engine->ac->PutSharedINGate(w_1(i), INPUT_BITLEN);
+            s_w[i] = mArithCir->PutSharedINGate(w_1(i), INPUT_BITLEN);
     }
 }
 
+void
+sgd::get_data (RegressionParams params,
+               Matrix<double>& plain_X, Vector<double>& plain_y, Vector<double>& plain_w,
+               bool provide_data)
+{
+    if (provide_data)
+        get_plain_data (plain_X, plain_y);
+    else
+    {   // Generate artificial data
+        LinearModelGen gen;
+
+        Vector<double> model(plain_w.size());
+        for (int i = 0; i < model.size(); ++i)
+        {
+            model(i) = rand() * i % 10;
+        }
+        gen.setModel(model);
+
+        gen.sample(plain_X, plain_y);
+    }
+
+    for (uint32_t i = 0; i < params.maxIterations; i++)
+    {
+        params.indices[i] = i % plain_X.rows(); // FIXME: indices[i] = rand() % rows; leads to silly results.
+                                         // Why? It seems rand() does interfere with
+                                         // something from ABY...
+    }
+    for (int i = 0; i < plain_w.size(); i++)
+        plain_w(i) = 0.0;
+
+}
+
 /* Returns z = ina*inb */
-static share*
-mul_q (EncryptionEngine *engine, share *ina, share *inb)
+share*
+sgd::mul_q (share *ina, share *inb)
 {
     share *ina_inv_yao, *inb_inv_yao, *ina_yao, *inb_yao, *mul_1, *mul_2, *ina_is_less_zero, *inb_is_less_zero, *res, *res_inv, *dec;
-    share *threshold = engine->yc->PutCONSGate(1ull << (INPUT_BITLEN-1), INPUT_BITLEN);
-    share *shift = engine->yc->PutCONSGate(engine->shift, INPUT_BITLEN);
+    share *threshold = mYaoCir->PutCONSGate(1ull << (INPUT_BITLEN-1), INPUT_BITLEN);
+    share *shift = mYaoCir->PutCONSGate(mShift, INPUT_BITLEN);
 
-    ina_yao = engine->yc->PutA2YGate(ina);
-    inb_yao = engine->yc->PutA2YGate(inb);
+    ina_yao = mYaoCir->PutA2YGate(ina);
+    inb_yao = mYaoCir->PutA2YGate(inb);
 
-    ina_inv_yao = engine->yc->PutINVGate(ina_yao);
-    inb_inv_yao = engine->yc->PutINVGate(inb_yao);
+    ina_inv_yao = mYaoCir->PutINVGate(ina_yao);
+    inb_inv_yao = mYaoCir->PutINVGate(inb_yao);
 
     // if ina < 0 or inb < 0
-    ina_is_less_zero = engine->yc->PutGTGate(ina_yao, threshold);
-    inb_is_less_zero = engine->yc->PutGTGate(inb_yao, threshold);
+    ina_is_less_zero = mYaoCir->PutGTGate(ina_yao, threshold);
+    inb_is_less_zero = mYaoCir->PutGTGate(inb_yao, threshold);
 
-    mul_1 = engine->yc->PutMUXGate(ina_inv_yao, ina_yao, ina_is_less_zero);
-    mul_2 = engine->yc->PutMUXGate(inb_inv_yao, inb_yao, inb_is_less_zero);
-    dec = engine->yc->PutXORGate (ina_is_less_zero, inb_is_less_zero);
+    mul_1 = mYaoCir->PutMUXGate(ina_inv_yao, ina_yao, ina_is_less_zero);
+    mul_2 = mYaoCir->PutMUXGate(inb_inv_yao, inb_yao, inb_is_less_zero);
+    dec = mYaoCir->PutXORGate (ina_is_less_zero, inb_is_less_zero);
 
-    res = engine->yc->PutMULGate(mul_1, mul_2); //FIXME: Maybe Y2A, ArithmeticMul, A2Y is faster?
-    res = engine->yc->PutBarrelRightShifterGate(res, shift);
-    res_inv = engine->yc->PutINVGate(res); // FIXME: INV-Gate in yao circuit not precise? Maybe use arithmetic circuit instead?
-    res = engine->yc->PutMUXGate(res_inv, res, dec);
+    res = mYaoCir->PutMULGate(mul_1, mul_2); //FIXME: Maybe Y2A, ArithmeticMul, A2Y is faster?
+    res = mYaoCir->PutBarrelRightShifterGate(res, shift);
+    res_inv = mYaoCir->PutINVGate(res); // FIXME: INV-Gate in yao circuit not precise? Maybe use arithmetic circuit instead?
+    res = mYaoCir->PutMUXGate(res_inv, res, dec);
 
-    res = engine->ac->PutY2AGate(res, engine->bc);
+    res = mArithCir->PutY2AGate(res, mBoolCir);
 
     return res;
 }
 
-static share*
-inner_prod(EncryptionEngine *engine, share **ina, share **inb, uint32_t columns)
+share*
+sgd::inner_prod(share **ina, share **inb, int columns)
 {
-    share **ret = (share**) malloc(sizeof(share*) * columns);
+    share **temp = (share**) malloc (sizeof(share*) * columns);
 
     // pairwise multiplication of all input values
-    for (uint32_t i = 0; i < columns; i++)
+    for (int i = 0; i < columns; i++)
     {
-        ret[i] = mul_q(engine, ina[i], inb[i]);
+        temp[i] = mul_q(ina[i], inb[i]);
     }
 
     // add up the individual multiplication results
     // in arithmetic sharing ADD is for free, and does not add circuit depth, thus simple sequential adding
-    for (uint32_t i = 1; i < columns; i++)
+    for (int i = 1; i < columns; i++)
     {
-        ret[0] = engine->ac->PutADDGate(ret[0], ret[i]);
+        temp[0] = mArithCir->PutADDGate(temp[0], temp[i]);
     }
 
-    return ret[0];
+    for (int i = 1; i < columns; i++)
+        free (temp[i]);
+
+    return temp[0];
 }
 
-static share**
-sgd (EncryptionEngine *engine, RegressionParams& params, share ***s_X,
-     share **s_w, share **s_y, uint32_t *indices, int columns)
+share**
+sgd::build_esgd_circuit (RegressionParams params,
+                         share ***s_X, share **s_w, share **s_y, int columns)
 {
-    share **temp = (share**) malloc (sizeof(share*) * columns);
+    share *error;
+    share **grad = (share**) malloc (sizeof(share*) * columns);
 
-    uint32_t learning_rate = (uint32_t) (params.learningRate * engine->precision);
+    uint32_t learning_rate = (uint32_t) (params.learningRate * mPrecision);
 
     for (uint32_t k = 0; k < params.maxIterations; k++)
     {
@@ -206,48 +241,48 @@ sgd (EncryptionEngine *engine, RegressionParams& params, share ***s_X,
          */
 
         // compute x*w
-        temp[0] = inner_prod(engine, s_X[indices[k]], s_w, columns);
-//        engine->ac->PutPrintValueGate(temp[0], "xw");
+        error = inner_prod(s_X[params.indices[k]], s_w, columns);
+//        mArithCir->PutPrintValueGate(temp[0], "xw");
 
         // compute x*w-y
-        temp[0] = engine->ac->PutSUBGate(temp[0], s_y[indices[k]]);
-//        engine->ac->PutPrintValueGate(temp[0], "xw-y");
+        error = mArithCir->PutSUBGate(error, s_y[params.indices[k]]);
+//        mArithCir->PutPrintValueGate(temp[0], "xw-y");
 
         // compute x_l(x*w-y)
         for (int i = 0; i < columns; i++)
         {
-            temp[i] = mul_q (engine, temp[0], s_X[indices[k]][i]);
-//            engine->ac->PutPrintValueGate(temp[i], "x_l(x*w-y)");
+            grad[i] = mul_q (error, s_X[params.indices[k]][i]);
+//            mArithCir->PutPrintValueGate(temp[i], "x_l(x*w-y)");
         }
 
-        share *alpha = engine->ac->PutCONSGate(learning_rate, INPUT_BITLEN);
+        share *alpha = mArithCir->PutCONSGate(learning_rate, INPUT_BITLEN);
 
-        // compute w = w - alpha * x_l(x*w-y)
+        // update w = w - alpha * x_l(x*w-y)
         for (int i = 0; i < columns; i++)
         {
-            temp[i] = mul_q (engine, alpha, temp[i]);
-//            engine->ac->PutPrintValueGate(temp[i], "alpha*x_l(x*w-y)");
-            s_w[i] = engine->ac->PutSUBGate(s_w[i], temp[i]);
-//            engine->ac->PutPrintValueGate(s_w[i], "w=w-alpha*x_l(x*w-y)");
+            s_w[i] = mArithCir->PutSUBGate(s_w[i], mul_q (alpha, grad[i]));
+//            mArithCir->PutPrintValueGate(s_w[i], "w=w-alpha*x_l(x*w-y)");
         }
     }
 
-    free (temp);
+    for (int i = 0; i < columns; i++)
+        free (grad[i]);
+    free (grad);
 
     return s_w;
 }
 
-static double
+double
 empirical_risk (Matrix<double> X, Vector<double> y, Vector<double> w)
 {
     Vector<double> error =  X * w - y;
-    double l2 = error.norm();
 
-    return l2;
+    return error.norm();
 }
 
-static Vector<double>
-plain_sgd (RegressionParams& params, Matrix<double> X, Vector<double> y, Vector<double> w, uint32_t *indices)
+Vector<double>
+sgd::plain_sgd (RegressionParams params,
+                Matrix<double> X, Vector<double> y, Vector<double> w)
 {
     Vector<double> grad;
     double error;
@@ -255,9 +290,9 @@ plain_sgd (RegressionParams& params, Matrix<double> X, Vector<double> y, Vector<
 
     for (uint32_t k = 0; k < params.maxIterations; k++)
     {
-            error = X.row(indices[k]).dot(w);
-            error -= y(indices[k]);
-            grad = error * X.row(indices[k]);
+            error = X.row(params.indices[k]).dot(w);
+            error -= y(params.indices[k]);
+            grad = error * X.row(params.indices[k]);
             w = w - alpha * grad;
 
             if (k % 10 == 0)
@@ -267,49 +302,12 @@ plain_sgd (RegressionParams& params, Matrix<double> X, Vector<double> y, Vector<
     return w;
 }
 
-int32_t main_sgd (e_role role, double learning_rate, uint32_t precision,
-                  uint32_t max_iter, bool provide_data, const std::string& address,
-                  uint16_t port, seclvl seclvl, uint32_t nvals, uint32_t nthreads,
-                  e_mt_gen_alg mt_alg)
+uint32_t*
+sgd::encrypted_sgd (RegressionParams params,
+                    Matrix<double> plain_X, Vector<double> plain_y, Vector<double> plain_w)
 {
-    EncryptionEngine *engine = encryption_engine_new (role, precision, address, port, seclvl, nthreads,  mt_alg);
-
-    int rows = 20;
-    int columns = 3;
-
-    Matrix<double> plain_X(rows, columns);
-    Vector<double> plain_y(rows);
-    Vector<double> plain_w(columns);
-
-    if (provide_data)
-        get_plain_data (plain_X, plain_y);
-    else
-    {   // Generate artificial data
-        LinearModelGen gen;
-
-        Vector<double> model(columns);
-        for (int i = 0; i < columns; ++i)
-        {
-            model(i) = rand() * i % 10;
-        }
-        gen.setModel(model);
-
-        gen.sample(plain_X, plain_y);
-    }
-
-    RegressionParams params;
-    params.maxIterations = max_iter;
-    params.learningRate = learning_rate;
-
-    uint32_t indices[params.maxIterations];
-    for (uint32_t i = 0; i < params.maxIterations; i++)
-    {
-        indices[i] = i % rows; // FIXME: indices[i] = rand() % rows; leads to silly results.
-                               // Why? It seems rand() does interfere with
-                               // something from ABY...
-    }
-    for (int i = 0; i < plain_w.size(); i++)
-        plain_w(i) = 0.0;
+    int rows = plain_X.rows();
+    int columns = plain_X.cols();
 
     share ***s_X = (share***) malloc(sizeof(share**) * rows);
     for (int i = 0; i < rows; i++)
@@ -317,40 +315,46 @@ int32_t main_sgd (e_role role, double learning_rate, uint32_t precision,
     share **s_y = (share**) malloc(sizeof(share*) * rows);
     share **s_w = (share**) malloc(sizeof(share*) * columns);
 
-    generate_shared_data (engine, s_X, s_y, s_w, plain_X, plain_y, plain_w);
+    generate_shared_data (s_X, s_y, s_w, plain_X, plain_y, plain_w);
 
-    share **s_out = sgd (engine, params, s_X, s_w, s_y, indices, columns);
+    share **s_out = build_esgd_circuit (params, s_X, s_w, s_y, columns);
 
+    /**
+     Step 8: Output the value of s_out (the computation result) to both parties
+     */
     for (int i = 0; i < columns; i++)
-        s_out[i] = engine->ac->PutOUTGate(s_out[i], ALL);
+        s_out[i] = mArithCir->PutOUTGate(s_out[i], ALL);
 
-    engine->party->ExecCircuit();
+    /**
+     Step 9: Executing the circuit using the ABYParty object evaluate the
+     problem.
+     */
+    mParty->ExecCircuit();
 
-    Vector<double> plain_output = plain_sgd (params, plain_X, plain_y, plain_w, indices);
-
-//    std::cout << model << "\n";  // Verify result for genModel
-
-    uint32_t output[columns];
-    std::cout << "---encrypted sgd---\n";
+    /**
+     Step 10: Type cast the plaintext output to 32 bit unsigned integer.
+     */
+    uint32_t *output = (uint32_t*) malloc (sizeof(uint32_t) * columns);
     for (int i = 0; i < columns; i++)
     {
         output[i] = s_out[i]->get_clear_value<uint32_t>();
-        std::cout << "w[" << i << "] = "  << (int32_t)output[i] / (double) engine->precision;
-
-        std::cout << "\n";
     }
-    std::cout << "---plain sgd---\n";
-    for (int i = 0; i < columns; i++)
-        std::cout << "w[" << i << "] = "  << plain_output(i) << "\n";
 
-    std::cout << "\n";
-
+    // free memory
     for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < columns; j++)
+            free (s_X[i][j]);
         free (s_X[i]);
+    }
     free (s_X);
+    for (int i = 0; i < rows; i++)
+        free (s_y[i]);
     free (s_y);
+    for (int i = 0; i < columns; i++)
+        free (s_w[i]);
     free (s_w);
 
-    return 0;
+    return output;
 }
 

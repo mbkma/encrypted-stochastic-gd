@@ -32,7 +32,7 @@ namespace encsgd
 
             void setModel(Vector<double>& model, double noise = 1, double sd = 1);
 
-            void sample(Matrix<double>& X, Vector<double>& Y);
+            void sample(Matrix<double>& X, Vector<double>& y);
     };
 }
 

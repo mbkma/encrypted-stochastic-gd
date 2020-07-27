@@ -21,7 +21,7 @@ elseif (NOT eigen_FOUND AND NOT TARGET eigen::eigen)
 	add_subdirectory(extern/eigen)
 endif()
 
-add_executable(main src/main.cpp src/linear-model-generator.cpp src/sgd.cpp)
+add_executable(main src/main.cpp src/sgd.cpp src/linear-model-generator.cpp)
 target_link_libraries(main ABY::aby eigen)
 
 target_compile_options(main PRIVATE "-Wall" "-Wextra" "-O0" "-g")

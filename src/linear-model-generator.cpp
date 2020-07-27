@@ -30,8 +30,8 @@ namespace encsgd
 
     void LinearModelGen::sample(Matrix<double>& X, Vector<double>& y)
     {
-        if (X.rows() != y.rows()) throw std::runtime_error("error in LinearModelGen::sample");
-        if (X.cols() != model_w.rows()) throw std::runtime_error("error in LinearModelGen::sample");
+        if (X.rows() != y.size()) throw std::runtime_error("error in LinearModelGen::sample");
+        if (X.cols() != model_w.size()) throw std::runtime_error("error in LinearModelGen::sample");
 
         std::default_random_engine generator;
         std::normal_distribution<double> distribution(mean, standard_deviation);

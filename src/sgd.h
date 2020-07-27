@@ -29,33 +29,60 @@
 
 namespace encsgd
 {
-        template<typename T>
-        using Matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    template<typename T>
+    using Matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
-        template<typename T>
-        using Vector = Eigen::Vector<T, Eigen::Dynamic>;
+    template<typename T>
+    using Vector = Eigen::Vector<T, Eigen::Dynamic>;
+
+    struct RegressionParams
+    {
+        uint32_t maxIterations;
+        double   learningRate;
+        uint32_t *indices;
+    };
+
+    class sgd
+    {
+        public:
+
+        void get_data (RegressionParams params, Matrix<double>& X, Vector<double>& y, Vector<double>& w, bool provide_data);
+
+        // TODO: Move plain_sgd to a seperate class
+        Vector<double> plain_sgd (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
+
+        // TODO: port return type to type Vector
+        uint32_t* encrypted_sgd (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
+
+        sgd (e_role role, uint32_t precision, const std::string& address, uint16_t port, seclvl seclvl, uint32_t nthreads, e_mt_gen_alg mt_alg);
+
+        uint32_t get_precision () { return mPrecision;};
+
+        private:
+
+        ABYParty *mParty;
+        ArithmeticCircuit *mArithCir;
+        BooleanCircuit *mBoolCir;
+        BooleanCircuit *mYaoCir;
+        e_role mRole;
+        uint32_t mPrecision;
+        uint32_t mShift;
+
+        void
+        generate_shared_data (share ***s_X, share **s_y, share **s_w,
+                              Matrix<double> plain_X, Vector<double> plain_y, Vector<double> plain_w);
+
+        share*
+        mul_q (share *ina, share *inb);
+
+        share*
+        inner_prod(share **ina, share **inb, int columns);
+
+        share**
+        build_esgd_circuit (RegressionParams params, share ***s_X,
+                            share **s_w, share **s_y, int columns);
+
+    };
 }
-
-struct RegressionParams
-{
-    uint32_t maxIterations;
-    double   learningRate;
-};
-
-typedef struct
-{
-    ABYParty *party;
-    ArithmeticCircuit *ac;
-    BooleanCircuit *bc;
-    BooleanCircuit *yc;
-    e_role role;
-    uint32_t precision;
-    uint32_t shift;
-} EncryptionEngine;
-
-int32_t main_sgd (e_role role, double learning_rate, uint32_t precision,
-                  uint32_t max_iter, bool provide_data, const std::string& address,
-                  uint16_t port, seclvl seclvl, uint32_t nvals, uint32_t nthreads,
-                  e_mt_gen_alg mt_alg);
 
 #endif /* __SGD_H_ */
