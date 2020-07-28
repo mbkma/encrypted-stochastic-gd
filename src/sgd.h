@@ -67,6 +67,8 @@ namespace encsgd
         e_role mRole;
         uint32_t mPrecision;
         uint32_t mShift;
+        share *s_mThreshold;
+        share *s_mShift;
 
         void
         generate_shared_data (share ***s_X, share **s_y, share **s_w,

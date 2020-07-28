@@ -170,32 +170,34 @@ sgd::get_data (RegressionParams params,
 
 /* Returns z = ina*inb */
 share*
-sgd::mul_q (share *ina, share *inb)
+sgd::mul_q (share *ina, share *inb)  //TODO: consider using Arith for MUL, Yao for GT,  Bool for MUX
 {
-    share *ina_inv_yao, *inb_inv_yao, *ina_yao, *inb_yao, *mul_1, *mul_2, *ina_is_less_zero, *inb_is_less_zero, *res, *res_inv, *dec;
-    share *threshold = mYaoCir->PutCONSGate(1ull << (INPUT_BITLEN-1), INPUT_BITLEN);
-    share *shift = mYaoCir->PutCONSGate(mShift, INPUT_BITLEN);
+    share *ina_bool_inv, *inb_bool_inv, *ina_bool, *inb_bool, *mul_1, *mul_2, *ina_is_less_zero, *inb_is_less_zero, *res, *res_inv, *dec;
 
-    ina_yao = mYaoCir->PutA2YGate(ina);
-    inb_yao = mYaoCir->PutA2YGate(inb);
+    ina_bool = mBoolCir->PutA2BGate(ina, mYaoCir);
+    inb_bool = mBoolCir->PutA2BGate(inb, mYaoCir);
 
-    ina_inv_yao = mYaoCir->PutINVGate(ina_yao);
-    inb_inv_yao = mYaoCir->PutINVGate(inb_yao);
+    ina_bool_inv = mBoolCir->PutINVGate(ina_bool);
+    inb_bool_inv = mBoolCir->PutINVGate(inb_bool);
 
     // if ina < 0 or inb < 0
-    ina_is_less_zero = mYaoCir->PutGTGate(ina_yao, threshold);
-    inb_is_less_zero = mYaoCir->PutGTGate(inb_yao, threshold);
+    ina_is_less_zero = mBoolCir->PutGTGate(ina_bool, s_mThreshold);
+    inb_is_less_zero = mBoolCir->PutGTGate(inb_bool, s_mThreshold);
 
-    mul_1 = mYaoCir->PutMUXGate(ina_inv_yao, ina_yao, ina_is_less_zero);
-    mul_2 = mYaoCir->PutMUXGate(inb_inv_yao, inb_yao, inb_is_less_zero);
-    dec = mYaoCir->PutXORGate (ina_is_less_zero, inb_is_less_zero);
+    mul_1 = mBoolCir->PutMUXGate(ina_bool_inv, ina_bool, ina_is_less_zero);
+    mul_2 = mBoolCir->PutMUXGate(inb_bool_inv, inb_bool, inb_is_less_zero);
+    dec = mBoolCir->PutXORGate (ina_is_less_zero, inb_is_less_zero);
 
-    res = mYaoCir->PutMULGate(mul_1, mul_2); //FIXME: Maybe Y2A, ArithmeticMul, A2Y is faster?
-    res = mYaoCir->PutBarrelRightShifterGate(res, shift);
-    res_inv = mYaoCir->PutINVGate(res); // FIXME: INV-Gate in yao circuit not precise? Maybe use arithmetic circuit instead?
-    res = mYaoCir->PutMUXGate(res_inv, res, dec);
+    mul_1 = mArithCir->PutB2AGate(mul_1);
+    mul_2 = mArithCir->PutB2AGate(mul_2);
+    res = mArithCir->PutMULGate(mul_1, mul_2);
 
-    res = mArithCir->PutY2AGate(res, mBoolCir);
+    res = mBoolCir->PutA2BGate(res, mYaoCir);
+    res = mBoolCir->PutBarrelRightShifterGate(res, s_mShift);
+    res_inv = mBoolCir->PutINVGate(res);
+    res = mBoolCir->PutMUXGate(res_inv, res, dec);
+
+    res = mArithCir->PutB2AGate(res);
 
     return res;
 }
@@ -316,6 +318,10 @@ sgd::encrypted_sgd (RegressionParams params,
     share **s_w = (share**) malloc(sizeof(share*) * columns);
 
     generate_shared_data (s_X, s_y, s_w, plain_X, plain_y, plain_w);
+
+    // Put in Constants
+    s_mThreshold = mBoolCir->PutCONSGate(1ull << (INPUT_BITLEN-1), INPUT_BITLEN);
+    s_mShift = mBoolCir->PutCONSGate(mShift, INPUT_BITLEN);
 
     share **s_out = build_esgd_circuit (params, s_X, s_w, s_y, columns);
 
