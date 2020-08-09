@@ -34,7 +34,7 @@ int32_t read_test_options(int32_t* argcp, char*** argvp, e_role* role,
         {(void*) &int_role, T_NUM, "r", "Role: 0/1", true, false },
         {(void*) learning_rate, T_DOUBLE, "l", "Learning Rate", true, false },
 
-        {(void*) &int_precision, T_NUM, "p", "Precision, default: 8", false, false },
+        {(void*) &int_precision, T_NUM, "p", "Precision, default: 8", false, false }, //doesnt work yet
         {(void*) provide_data, T_FLAG, "d", "Provide Data, default: False", false, false },
         {(void*) max_iter, T_NUM, "t", "Max iterations, default: 100", false, false }, // FIXME: doesnt work yet
 
@@ -83,7 +83,7 @@ int main(int argc, char** argv)
 {
     e_role role;
     double learning_rate = 0;
-    uint32_t nvals = 1, secparam = 128, nthreads = 1, precision = 8, max_iter = 100;
+    uint32_t nvals = 1, secparam = 128, nthreads = 1, precision = 8, max_iter = 150;
     uint16_t port = 7766;
     bool provide_data = false;
     std::string address = "127.0.0.1";

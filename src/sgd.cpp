@@ -250,18 +250,13 @@ sgd::build_esgd_circuit (RegressionParams params,
         error = mArithCir->PutSUBGate(error, s_y[params.indices[k]]);
 //        mArithCir->PutPrintValueGate(temp[0], "xw-y");
 
-        // compute x_l(x*w-y)
+        share *alpha = mArithCir->PutCONSGate(learning_rate, INPUT_BITLEN);
         for (int i = 0; i < columns; i++)
         {
+            // compute x_l(x*w-y)
             grad[i] = mul_q (error, s_X[params.indices[k]][i]);
 //            mArithCir->PutPrintValueGate(temp[i], "x_l(x*w-y)");
-        }
-
-        share *alpha = mArithCir->PutCONSGate(learning_rate, INPUT_BITLEN);
-
-        // update w = w - alpha * x_l(x*w-y)
-        for (int i = 0; i < columns; i++)
-        {
+            // update w = w - alpha * x_l(x*w-y)
             s_w[i] = mArithCir->PutSUBGate(s_w[i], mul_q (alpha, grad[i]));
 //            mArithCir->PutPrintValueGate(s_w[i], "w=w-alpha*x_l(x*w-y)");
         }
