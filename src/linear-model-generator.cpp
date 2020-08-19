@@ -30,9 +30,6 @@ namespace encsgd
 
     void LinearModelGen::sample(Matrix<double>& X, Vector<double>& y)
     {
-        if (X.rows() != y.size()) throw std::runtime_error("error in LinearModelGen::sample");
-        if (X.cols() != model_w.size()) throw std::runtime_error("error in LinearModelGen::sample");
-
         std::default_random_engine generator;
         std::normal_distribution<double> distribution(mean, standard_deviation);
 
@@ -40,7 +37,8 @@ namespace encsgd
 
         for (int i = 0; i < X.rows(); i++)
         {
-            for (int j = 0; j < X.cols(); j++)
+            X(i, 0) = 1;
+            for (int j = 1; j < X.cols(); j++)
                 X(i, j) = distribution(generator);
 
             noise(i) = distribution(generator);
@@ -48,4 +46,52 @@ namespace encsgd
 
         y = X * model_w + noise;
     }
+
+    void LogisticModelGen::setModel(Vector<double>& model, double noise, double sd)
+    {
+        model_w = model;
+        mean = noise;
+        standard_deviation = sd;
+    }
+
+    void LogisticModelGen::sample(Matrix<double>& X, Vector<double>& Y, bool print)
+    {
+        std::default_random_engine generator;
+        std::normal_distribution<double> distribution(mean, standard_deviation);
+
+        Vector<double> noise(X.rows());
+
+
+        for (int i = 0; i < X.rows(); ++i)
+        {
+            for (int j = 0; j < X.cols(); ++j)
+            {
+                X(i, j) = distribution(generator);
+            }
+
+            noise(i) = distribution(generator);
+            //std::cout << "n" << i << " = " << noise(i, 0) << std::endl;;
+        }
+
+        Y = X * model_w + noise;
+
+        for (int i = 0; i < Y.size(); ++i)
+        {
+            auto y = Y(i);
+            //auto yy = 1.0 / (1 + std::exp(-Y(i)));
+            Y(i) = y > 0;
+
+            if (print)
+            {
+
+                for (int j = 0; j < X.cols(); ++j)
+                {
+                    std::cout << X(i, j) << " ";
+                }
+
+                std::cout << "-> " << Y(i) << " (" << y << ")" << std::endl;
+            }
+        }
+    }
+
 }

@@ -55,7 +55,9 @@ sgd::sgd (e_role role, uint32_t precision, const std::string& address,
 static void
 get_plain_data (Matrix<double>& plain_X, Vector<double>& plain_y)
 {
-    std::ifstream features("../data/abalone.data");
+    /* You can insert your according data and label files here */
+
+    std::ifstream features("../data/train.data");
     for (int i = 0; i < plain_X.rows(); i++)
     {
         for (int j = 0; j < plain_X.cols(); j++)
@@ -64,13 +66,12 @@ get_plain_data (Matrix<double>& plain_X, Vector<double>& plain_y)
     }
     features.close();
 
-/*
     std::ifstream labels("../data/train.labels");
     for (int i = 0; i < plain_X.rows(); i++)
     {
         labels >> plain_y(i);
     }
-    labels.close();*/
+    labels.close();
 }
 
 void
@@ -164,38 +165,27 @@ sgd::get_data (RegressionParams params,
                                          // something from ABY...
     }
     for (int i = 0; i < plain_w.size(); i++)
-        plain_w(i) = 0.0;
+        plain_w(i) = 1.0;
 
 }
 
+/* This is a very inefficient hack which simulates mul_truncation which is not available in ABY */
 /* Returns z = ina*inb */
 share*
-sgd::mul_q (share *ina, share *inb)  //TODO: consider using Arith for MUL, Yao for GT,  Bool for MUX
+sgd::mul_trunc (share *ina, share *inb)
 {
-    share *ina_bool_inv, *inb_bool_inv, *ina_bool, *inb_bool, *mul_1, *mul_2, *ina_is_less_zero, *inb_is_less_zero, *res, *res_inv, *dec;
+    share *res, *res_is_less_zero, *res_inv;
 
-    ina_bool = mBoolCir->PutA2BGate(ina, mYaoCir);
-    inb_bool = mBoolCir->PutA2BGate(inb, mYaoCir);
-
-    ina_bool_inv = mBoolCir->PutINVGate(ina_bool);
-    inb_bool_inv = mBoolCir->PutINVGate(inb_bool);
-
-    // if ina < 0 or inb < 0
-    ina_is_less_zero = mBoolCir->PutGTGate(ina_bool, s_mThreshold);
-    inb_is_less_zero = mBoolCir->PutGTGate(inb_bool, s_mThreshold);
-
-    mul_1 = mBoolCir->PutMUXGate(ina_bool_inv, ina_bool, ina_is_less_zero);
-    mul_2 = mBoolCir->PutMUXGate(inb_bool_inv, inb_bool, inb_is_less_zero);
-    dec = mBoolCir->PutXORGate (ina_is_less_zero, inb_is_less_zero);
-
-    mul_1 = mArithCir->PutB2AGate(mul_1);
-    mul_2 = mArithCir->PutB2AGate(mul_2);
-    res = mArithCir->PutMULGate(mul_1, mul_2);
+    res = mArithCir->PutMULGate(ina, inb);
 
     res = mBoolCir->PutA2BGate(res, mYaoCir);
-    res = mBoolCir->PutBarrelRightShifterGate(res, s_mShift);
+
+    res_is_less_zero = mBoolCir->PutGTGate(res, s_mThreshold);
     res_inv = mBoolCir->PutINVGate(res);
-    res = mBoolCir->PutMUXGate(res_inv, res, dec);
+    res = mBoolCir->PutBarrelRightShifterGate(res, s_mShift);
+    res_inv = mBoolCir->PutBarrelRightShifterGate(res_inv, s_mShift);
+    res_inv = mBoolCir->PutINVGate(res_inv);
+    res = mBoolCir->PutMUXGate(res_inv, res, res_is_less_zero);
 
     res = mArithCir->PutB2AGate(res);
 
@@ -210,7 +200,7 @@ sgd::inner_prod(share **ina, share **inb, int columns)
     // pairwise multiplication of all input values
     for (int i = 0; i < columns; i++)
     {
-        temp[i] = mul_q(ina[i], inb[i]);
+        temp[i] = mul_trunc(ina[i], inb[i]);
     }
 
     // add up the individual multiplication results
@@ -219,9 +209,6 @@ sgd::inner_prod(share **ina, share **inb, int columns)
     {
         temp[0] = mArithCir->PutADDGate(temp[0], temp[i]);
     }
-
-    for (int i = 1; i < columns; i++)
-        free (temp[i]);
 
     return temp[0];
 }
@@ -244,7 +231,7 @@ sgd::build_esgd_circuit (RegressionParams params,
 
         // compute x*w
         error = inner_prod(s_X[params.indices[k]], s_w, columns);
-//        mArithCir->PutPrintValueGate(temp[0], "xw");
+//        mArithCir->PutPrintValueGate(error, "xw");
 
         // compute x*w-y
         error = mArithCir->PutSUBGate(error, s_y[params.indices[k]]);
@@ -254,10 +241,10 @@ sgd::build_esgd_circuit (RegressionParams params,
         for (int i = 0; i < columns; i++)
         {
             // compute x_l(x*w-y)
-            grad[i] = mul_q (error, s_X[params.indices[k]][i]);
+            grad[i] = mul_trunc (error, s_X[params.indices[k]][i]);
 //            mArithCir->PutPrintValueGate(temp[i], "x_l(x*w-y)");
             // update w = w - alpha * x_l(x*w-y)
-            s_w[i] = mArithCir->PutSUBGate(s_w[i], mul_q (alpha, grad[i]));
+            s_w[i] = mArithCir->PutSUBGate(s_w[i], mul_trunc (alpha, grad[i]));
 //            mArithCir->PutPrintValueGate(s_w[i], "w=w-alpha*x_l(x*w-y)");
         }
     }
@@ -278,8 +265,8 @@ empirical_risk (Matrix<double> X, Vector<double> y, Vector<double> w)
 }
 
 Vector<double>
-sgd::plain_sgd (RegressionParams params,
-                Matrix<double> X, Vector<double> y, Vector<double> w)
+sgd::plain_linear_regression (RegressionParams params,
+                              Matrix<double> X, Vector<double> y, Vector<double> w)
 {
     Vector<double> grad;
     double error;
@@ -287,13 +274,61 @@ sgd::plain_sgd (RegressionParams params,
 
     for (uint32_t k = 0; k < params.maxIterations; k++)
     {
+            if (k % 10 == 0)
+                std::cout << "--- risk: " << empirical_risk (X, y, w) << "---\n";
+
             error = X.row(params.indices[k]).dot(w);
             error -= y(params.indices[k]);
             grad = error * X.row(params.indices[k]);
             w = w - alpha * grad;
+    }
 
+    return w;
+}
+
+std::array<double,2>
+test_plain_logistic_regression (Matrix<double> X, Vector<double> y, Vector<double> w)
+{
+    Vector<double> xw =  X * w;
+    Vector<double> ret(xw.size());
+    uint64_t count = 0;
+
+    for (int i = 0; i < xw.size(); i++)
+        ret(i) = 1.0 / (1 + std::exp(-xw(i)));
+
+    ret -= y;
+
+	for (int i = 0; i < xw.size(); ++i)
+	{
+		bool c0 = xw(i) > 0.5;
+		bool c1 = y(i) > 0.5;
+
+		count += (c0 == c1);
+	}
+
+    return {ret.norm(), (double) count };
+}
+
+Vector<double>
+sgd::plain_logistic_regression (RegressionParams params,
+                                Matrix<double> X, Vector<double> y, Vector<double> w)
+{
+    Vector<double> grad;
+    double xw, sxw;
+    double alpha = params.learningRate;
+
+    for (uint32_t k = 0; k < params.maxIterations; k++)
+    {
             if (k % 10 == 0)
-                std::cout << "--- risk: " << empirical_risk (X, y, w) << "---\n";
+            {
+                std::array<double,2> r = test_plain_logistic_regression (X, y, w);
+                std::cout << "--- risk: " << r[0] << "---\n";
+            }
+
+            xw = X.row(params.indices[k]).dot(w);
+            sxw = 1.0 / (1 + std::exp(-xw));
+            grad = (sxw - y(params.indices[k])) * X.row(params.indices[k]);
+            w = w - alpha * grad;
     }
 
     return w;

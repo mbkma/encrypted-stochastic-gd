@@ -49,7 +49,9 @@ namespace encsgd
         void get_data (RegressionParams params, Matrix<double>& X, Vector<double>& y, Vector<double>& w, bool provide_data);
 
         // TODO: Move plain_sgd to a seperate class
-        Vector<double> plain_sgd (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
+        Vector<double> plain_linear_regression (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
+
+        Vector<double> plain_logistic_regression (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
 
         // TODO: port return type to type Vector
         uint32_t* encrypted_sgd (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
@@ -75,7 +77,7 @@ namespace encsgd
                               Matrix<double> plain_X, Vector<double> plain_y, Vector<double> plain_w);
 
         share*
-        mul_q (share *ina, share *inb);
+        mul_trunc (share *ina, share *inb);
 
         share*
         inner_prod(share **ina, share **inb, int columns);
