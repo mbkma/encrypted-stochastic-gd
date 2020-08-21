@@ -53,8 +53,7 @@ namespace encsgd
 
         Vector<double> plain_logistic_regression (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
 
-        // TODO: port return type to type Vector
-        uint32_t* encrypted_sgd (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
+        Vector<uint32_t> encrypted_sgd (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
 
         sgd (e_role role, uint32_t precision, const std::string& address, uint16_t port, seclvl seclvl, uint32_t nthreads, e_mt_gen_alg mt_alg);
 

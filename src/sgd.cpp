@@ -62,7 +62,6 @@ get_plain_data (Matrix<double>& plain_X, Vector<double>& plain_y)
     {
         for (int j = 0; j < plain_X.cols(); j++)
             features >> plain_X(i,j);
-        features >> plain_y(i);
     }
     features.close();
 
@@ -334,7 +333,7 @@ sgd::plain_logistic_regression (RegressionParams params,
     return w;
 }
 
-uint32_t*
+Vector<uint32_t>
 sgd::encrypted_sgd (RegressionParams params,
                     Matrix<double> plain_X, Vector<double> plain_y, Vector<double> plain_w)
 {
@@ -370,10 +369,10 @@ sgd::encrypted_sgd (RegressionParams params,
     /**
      Step 10: Type cast the plaintext output to 32 bit unsigned integer.
      */
-    uint32_t *output = (uint32_t*) malloc (sizeof(uint32_t) * columns);
+    Vector<uint32_t> output(columns);
     for (int i = 0; i < columns; i++)
     {
-        output[i] = s_out[i]->get_clear_value<uint32_t>();
+        output(i) = s_out[i]->get_clear_value<uint32_t>();
     }
 
     // free memory

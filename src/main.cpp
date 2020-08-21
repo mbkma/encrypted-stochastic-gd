@@ -111,20 +111,18 @@ int main(int argc, char** argv)
 
     engine.get_data (params, plain_X, plain_y, plain_w, provide_data);
 
-    uint32_t* encrypted_output = engine.encrypted_sgd (params, plain_X, plain_y, plain_w);
+    Vector<uint32_t> encrypted_output = engine.encrypted_sgd (params, plain_X, plain_y, plain_w);
 
     Vector<double> plain_output = engine.plain_linear_regression (params, plain_X, plain_y, plain_w);
 
     std::cout << "---encrypted sgd---\n";
     for (int i = 0; i < columns; i++)
     {
-        std::cout << (int32_t)encrypted_output[i] / (double)engine.get_precision() << "\n";
+        std::cout << (int32_t)encrypted_output(i) / (double)engine.get_precision() << "\n";
     }
     std::cout << "\n";
     std::cout << "---plain sgd---\n";
     std::cout << plain_output << "\n";
-
-    free (encrypted_output);
 
     return 0;
 }
