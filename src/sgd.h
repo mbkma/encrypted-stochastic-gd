@@ -53,7 +53,11 @@ namespace encsgd
 
         Vector<double> plain_logistic_regression (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
 
-        Vector<uint32_t> encrypted_sgd (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
+        Vector<uint32_t> encrypted_linear_regression (RegressionParams params, Matrix<double> X, Vector<double> y, Vector<double> w);
+
+        Vector<uint32_t>
+        encrypted_logistic_regression (RegressionParams params,
+                    Matrix<double> plain_X, Vector<double> plain_y, Vector<double> plain_w);
 
         sgd (e_role role, uint32_t precision, const std::string& address, uint16_t port, seclvl seclvl, uint32_t nthreads, e_mt_gen_alg mt_alg);
 
@@ -70,6 +74,10 @@ namespace encsgd
         uint32_t mShift;
         share *s_mThreshold;
         share *s_mShift;
+        share *s_mZero_five;
+        share *s_mZero_two_five;
+        share *s_mZero;
+        share *s_mOne;
 
         void
         generate_shared_data (share ***s_X, share **s_y, share **s_w,
@@ -79,11 +87,18 @@ namespace encsgd
         mul_trunc (share *ina, share *inb);
 
         share*
+        activation_function(share *u);
+
+        share*
         inner_prod(share **ina, share **inb, int columns);
 
         share**
-        build_esgd_circuit (RegressionParams params, share ***s_X,
+        build_linear_regression_circuit (RegressionParams params, share ***s_X,
                             share **s_w, share **s_y, int columns);
+
+        share**
+        build_logistic_regression_circuit (RegressionParams params,
+                         share ***s_X, share **s_w, share **s_y, int columns);
 
     };
 }

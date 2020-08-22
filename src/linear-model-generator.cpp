@@ -64,7 +64,8 @@ namespace encsgd
 
         for (int i = 0; i < X.rows(); ++i)
         {
-            for (int j = 0; j < X.cols(); ++j)
+            X(i, 0) = 1;
+            for (int j = 1; j < X.cols(); ++j)
             {
                 X(i, j) = distribution(generator);
             }

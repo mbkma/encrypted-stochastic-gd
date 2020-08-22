@@ -42,7 +42,7 @@ namespace encsgd
             Vector<double> model_w;
             double mean, standard_deviation;
 
-            void setModel(Vector<double>& model, double noise = 1, double sd = 1);
+            void setModel(Vector<double>& model, double noise = 1, double sd = 2);
 
             void sample(Matrix<double>& X, Vector<double>& y, bool print);
     };
