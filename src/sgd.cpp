@@ -201,21 +201,27 @@ sgd::plain_linear_regression (RegressionParams params,
 }
 
 /* This is a very inefficient hack which simulates mul_truncation which is not available in ABY */
-/* Returns z = ina*inb */
+/* Returns z = t(ina * inb), where t() denotes truncation */
 share*
 sgd::mul_trunc (share *ina, share *inb)
 {
     share *res, *res_is_less_zero, *res_inv;
 
+    /* Compute res = ina * inb */
     res = mArithCir->PutMULGate(ina, inb);
 
     res = mBoolCir->PutA2BGate(res, mYaoCir);
 
+    /* If res > 2^{l-1} (i.e. < 0), set res = 2^l - res (i.e. compute |res|) */
     res_is_less_zero = mBoolCir->PutGTGate(res, s_mThreshold);
     res_inv = mBoolCir->PutINVGate(res);
+    res = mBoolCir->PutMUXGate(res_inv, res, res_is_less_zero);
+
+    /* Now res is < 2^{l-1}, therefore compute res = res >> l_f (i.e. res <- t(res)) */
     res = mBoolCir->PutBarrelRightShifterGate(res, s_mShift);
-    res_inv = mBoolCir->PutBarrelRightShifterGate(res_inv, s_mShift);
-    res_inv = mBoolCir->PutINVGate(res_inv);
+
+    /* If ina * inb was > 2^{l-1} set res = 2^l - res */
+    res_inv = mBoolCir->PutINVGate(res);
     res = mBoolCir->PutMUXGate(res_inv, res, res_is_less_zero);
 
     res = mArithCir->PutB2AGate(res);
