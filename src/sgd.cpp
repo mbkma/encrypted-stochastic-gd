@@ -217,7 +217,7 @@ sgd::mul_trunc (share *ina, share *inb)
     res_inv = mBoolCir->PutINVGate(res);
     res = mBoolCir->PutMUXGate(res_inv, res, res_is_less_zero);
 
-    /* Now res is < 2^{l-1}, therefore compute res = res >> l_f (i.e. res <- t(res)) */
+    /* Now res is < 2^{l-1}, therefore compute res = res >> l_f (i.e. res = t(res)) */
     res = mBoolCir->PutBarrelRightShifterGate(res, s_mShift);
 
     /* If ina * inb was > 2^{l-1} set res = 2^l - res */
@@ -372,6 +372,37 @@ test_plain_logistic_regression (Matrix<double> X, Vector<double> y, Vector<doubl
     return {ret.norm()/ (double) y.size(), (double) count / (double) y.size() };
 }
 
+double
+sgd::activation_function(double xw)
+{
+//    return 1.0 / (1 + std::exp(-xw));
+
+/*
+    if (xw < -3.5)
+        return 0;
+    else if (xw > 3.5)
+        return 1;
+    else
+      return -0.00497681442767818*pow(xw,3) + 0.212325272840903*xw + 0.50;
+*/
+
+
+/*    if (xw <= -0.5)
+        return 0;
+    else if (xw >= 0.5)
+        return 1;
+    else
+        return xw+0.5;*/
+
+    if (xw <= -4)
+        return 0;
+    else if (xw >= 4)
+        return 1;
+    else
+        return 0.125*xw + 0.50;
+
+}
+
 Vector<double>
 sgd::plain_logistic_regression (RegressionParams params,
                                 Matrix<double> X, Vector<double> y, Vector<double> w)
@@ -389,7 +420,7 @@ sgd::plain_logistic_regression (RegressionParams params,
             }
 
             xw = X.row(params.indices[k]).dot(w);
-            sxw = 1.0 / (1 + std::exp(-xw));
+            sxw = activation_function(xw);
             grad = (sxw - y(params.indices[k])) * X.row(params.indices[k]);
             w = w - alpha * grad;
     }
@@ -400,19 +431,25 @@ sgd::plain_logistic_regression (RegressionParams params,
 share*
 sgd::activation_function(share *u)
 {
-    share *u_plus = mArithCir->PutADDGate(u, s_mZero_five);
-    share *u_minus = mArithCir->PutSUBGate(u, s_mZero_five);
+    share *u_plus = mArithCir->PutADDGate(u, s_mFour);
+    share *u_minus = mArithCir->PutSUBGate(u, s_mFour);
 
-    share *u_plus_b = mBoolCir->PutA2BGate(u_plus, mYaoCir);
-    share *u_minus_b = mBoolCir->PutA2BGate(u_minus, mYaoCir);
+    share *u_plus_yao = mYaoCir->PutA2YGate(u_plus);
+    share *u_minus_yao = mYaoCir->PutA2YGate(u_minus);
 
-    // if u+0.5 < 0
-    share *b1 = mBoolCir->PutGTGate(u_plus_b, s_mThreshold);
-    // if u-0.5 > 0
-    share *b2 = mBoolCir->PutGTGate(s_mThreshold, u_minus_b);
+    // if u+4 < 0
+    share *b1 = mYaoCir->PutGTGate(u_plus_yao, s_mThresholdYao);
+    // if u-4 > 0
+    share *b2 = mYaoCir->PutGTGate(s_mThresholdYao, u_minus_yao);
 
-    share *res = mBoolCir->PutMUXGate(s_mZero, u_plus_b, b1);
+    b1 = mBoolCir->PutY2BGate(b1);
+    b2 = mBoolCir->PutY2BGate(b2);
 
+    share *res = mul_trunc (s_mF, u_plus);
+
+    res = mBoolCir->PutA2BGate(res, mYaoCir);
+
+    res = mBoolCir->PutMUXGate(s_mZero, res, b1);
     res = mBoolCir->PutMUXGate(s_mOne, res, b2);
 
     res = mArithCir->PutB2AGate(res);
@@ -430,8 +467,6 @@ sgd::build_logistic_regression_circuit (RegressionParams params,
     share **grad = (share**) malloc (sizeof(share*) * columns);
 
     uint32_t learning_rate = (uint32_t) (params.learningRate * mPrecision);
-
-    mArithCir->PutPrintValueGate(s_mZero_five, "zero_five");
 
     for (uint32_t k = 0; k < params.maxIterations; k++)
     {
@@ -486,8 +521,10 @@ sgd::encrypted_logistic_regression (RegressionParams params,
 
     // Put in Constants
     s_mThreshold = mBoolCir->PutCONSGate(1ull << (INPUT_BITLEN-1), INPUT_BITLEN);
+    s_mThresholdYao = mYaoCir->PutCONSGate(1ull << (INPUT_BITLEN-1), INPUT_BITLEN);
     s_mShift = mBoolCir->PutCONSGate(mShift, INPUT_BITLEN);
-    s_mZero_five = mArithCir->PutCONSGate((uint32_t) (0.5 * mPrecision), INPUT_BITLEN);
+    s_mFour = mArithCir->PutCONSGate((uint32_t) (4 * mPrecision), INPUT_BITLEN);
+    s_mF = mArithCir->PutCONSGate((uint32_t) (0.125 * mPrecision), INPUT_BITLEN);
     s_mOne = mBoolCir->PutCONSGate((uint32_t) (1 * mPrecision), INPUT_BITLEN);
     s_mZero = mBoolCir->PutCONSGate(int_null, INPUT_BITLEN);
 

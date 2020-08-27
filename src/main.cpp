@@ -83,7 +83,7 @@ int main(int argc, char** argv)
 {
     e_role role;
     double learning_rate = 0;
-    uint32_t nvals = 1, secparam = 128, nthreads = 1, precision = 5, max_iter = 150;
+    uint32_t nvals = 1, secparam = 128, nthreads = 1, precision = 8, max_iter = 200;
     uint16_t port = 7766;
     bool provide_data = false;
     std::string address = "127.0.0.1";
@@ -91,8 +91,8 @@ int main(int argc, char** argv)
     uint32_t indices[max_iter];
 
     /* Currently you still have to insert the data sets size here */
-    int rows = 1000;
-    int columns = 8;
+    int rows = 200;
+    int columns = 7;
     Matrix<double> plain_X(rows, columns);
     Vector<double> plain_y(rows);
     Vector<double> plain_w(columns);

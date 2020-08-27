@@ -74,10 +74,11 @@ namespace encsgd
         uint32_t mShift;
         share *s_mThreshold;
         share *s_mShift;
-        share *s_mZero_five;
-        share *s_mZero_two_five;
+        share *s_mFour;
+        share *s_mF;
         share *s_mZero;
         share *s_mOne;
+        share *s_mThresholdYao;
 
         void
         generate_shared_data (share ***s_X, share **s_y, share **s_w,
@@ -85,6 +86,9 @@ namespace encsgd
 
         share*
         mul_trunc (share *ina, share *inb);
+
+        double
+        activation_function(double xw);
 
         share*
         activation_function(share *u);
