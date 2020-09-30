@@ -1,11 +1,11 @@
 # Encrypted Stochastic Gradient Descent
 
-Encrypted stochastic gradient descent using secure two-party computation and the ABY framework.
+Encrypted stochastic gradient descent using secure two-party computation and the [ABY framework](https://github.com/encryptogroup/ABY).
 
 #### Requirements
 ---
 
-* A **Linux distribution** of your choice (ESGD was developed and tested with recent versions of [Debian](https://www.debian.org/)).
+* A **Linux distribution** of your choice (ESGD was developed and tested with [Debian 10](https://www.debian.org/)).
 * **Required packages:**
   * [`g++`](https://packages.debian.org/testing/g++) (version >=8)
     or another compiler and standard library implementing C++17 including the filesystem library
@@ -26,9 +26,24 @@ Encrypted stochastic gradient descent using secure two-party computation and the
 
 #### Example
 ---
+
+To run ESGD via LAN on two different machines:
 Assuming Alice ip-adress is 111.111.11:   
 On Alice machine: `./main -r 0 -l 0.03 -a 111.111.11`   
 On Bobs machine: `./main -r 1 -l 0.03 -a 111.111.11`
+
+To test ESGD on a single machine:
+Open two terminal windows.
+
+In the first one type:
+
+`./main -r 0 -l 0.03`
+
+and in the second one:
+
+`./main -r 1 -l 0.03`
+
+The option `-l` refers to the stepsize used in the stochastic gradient descent algorithm.
 
 #### Important Note
 ---
